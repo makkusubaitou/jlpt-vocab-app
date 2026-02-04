@@ -1,101 +1,179 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { JlptProgressBar, ProgressStats } from '@/components/progress-bar';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { PoolStatus } from '@/components/pool-status';
+
+interface ProgressData {
+  level: string;
+  total: number;
+  known: number;
+  active: number;
+  notStarted: number;
+}
+
+interface DashboardData {
+  progress: ProgressData[];
+  stats: {
+    dueForReview: number;
+    totalLearned: number;
+  };
+}
+
+interface PoolData {
+  current: number;
+  target: number;
+  spotsAvailable: number;
+}
+
+export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [poolData, setPoolData] = useState<PoolData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [progressRes, learnRes] = await Promise.all([
+        fetch('/api/progress'),
+        fetch('/api/learn'),
+      ]);
+
+      if (progressRes.ok) {
+        const progressData = await progressRes.json();
+        setData(progressData);
+      }
+
+      if (learnRes.ok) {
+        const learnData = await learnRes.json();
+        setPoolData(learnData.poolStatus);
+      }
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-background">
+      <header className="border-b">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold">JLPT Vocab</h1>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button variant="ghost" onClick={handleLogout}>
+              Logout
+            </Button>
+          </div>
+        </div>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <main className="container mx-auto px-4 py-8 space-y-6">
+        {/* Pool Status */}
+        {poolData && (
+          <PoolStatus
+            current={poolData.current}
+            target={poolData.target}
+            spotsAvailable={poolData.spotsAvailable}
+          />
+        )}
+
+        {/* Quick Stats */}
+        {data && (
+          <ProgressStats
+            dueForReview={data.stats.dueForReview}
+            totalLearned={data.stats.totalLearned}
+          />
+        )}
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-4">
+          <Link href="/review" className="block">
+            <Button className="w-full h-16 text-lg" size="lg">
+              Start Review
+              {data && data.stats.dueForReview > 0 && (
+                <span className="ml-2 bg-primary-foreground text-primary rounded-full px-2 py-0.5 text-sm">
+                  {data.stats.dueForReview}
+                </span>
+              )}
+            </Button>
+          </Link>
+          <Link href="/learn" className="block">
+            <Button variant="outline" className="w-full h-16 text-lg" size="lg">
+              Learn New
+              {poolData && poolData.spotsAvailable > 0 && (
+                <span className="ml-2 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100 rounded-full px-2 py-0.5 text-sm">
+                  +{poolData.spotsAvailable}
+                </span>
+              )}
+            </Button>
+          </Link>
+        </div>
+
+        {/* Progress by Level */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Progress by Level</CardTitle>
+            <CardDescription>
+              Track your learning progress across all JLPT levels
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {data?.progress.map((item) => (
+              <JlptProgressBar
+                key={item.level}
+                level={item.level}
+                total={item.total}
+                known={item.known}
+                active={item.active}
+              />
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Quick Links */}
+        <div className="grid grid-cols-3 gap-4">
+          <Link href="/search">
+            <Button variant="secondary" className="w-full">
+              Search
+            </Button>
+          </Link>
+          <Link href="/add">
+            <Button variant="secondary" className="w-full">
+              Add Word
+            </Button>
+          </Link>
+          <Link href="/settings">
+            <Button variant="secondary" className="w-full">
+              Settings
+            </Button>
+          </Link>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
