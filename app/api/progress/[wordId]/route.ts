@@ -69,18 +69,21 @@ export async function PATCH(
         current.comfortLevel || 0
       );
 
+      const graduated = comfortLevel >= 5;
+
       const result = await db
         .update(userProgress)
         .set({
           comfortLevel,
-          nextReview,
+          nextReview: graduated ? null : nextReview,
           lastReviewed: new Date(),
           reviewCount: (current.reviewCount || 0) + 1,
+          status: graduated ? 'known' : 'active',
         })
         .where(eq(userProgress.wordId, wordIdNum))
         .returning();
 
-      return NextResponse.json(result[0]);
+      return NextResponse.json({ ...result[0], graduated });
     }
 
     return NextResponse.json(

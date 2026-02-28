@@ -9,10 +9,21 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const jlptLevel = searchParams.get('level');
 
-    if (forReview) {
-      // Get words that are due for review
+    const practice = searchParams.get('practice') === 'true';
+
+    if (forReview || practice) {
       const now = new Date();
-      
+
+      const whereClause = practice
+        ? eq(userProgress.status, 'active')
+        : and(
+            eq(userProgress.status, 'active'),
+            or(
+              lte(userProgress.nextReview, now),
+              isNull(userProgress.nextReview)
+            )
+          );
+
       const result = await db
         .select({
           id: words.id,
@@ -29,15 +40,7 @@ export async function GET(request: NextRequest) {
         })
         .from(userProgress)
         .innerJoin(words, eq(userProgress.wordId, words.id))
-        .where(
-          and(
-            eq(userProgress.status, 'active'),
-            or(
-              lte(userProgress.nextReview, now),
-              isNull(userProgress.nextReview)
-            )
-          )
-        )
+        .where(whereClause)
         .orderBy(sql`RANDOM()`)
         .limit(limit);
 

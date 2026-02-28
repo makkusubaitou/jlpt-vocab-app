@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,6 +30,18 @@ interface PoolStatus {
 }
 
 export default function ReviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading review session...</p>
+      </div>
+    }>
+      <ReviewContent />
+    </Suspense>
+  );
+}
+
+function ReviewContent() {
   const [words, setWords] = useState<ReviewWord[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
@@ -39,11 +51,17 @@ export default function ReviewPage() {
   const [sessionStats, setSessionStats] = useState({ reviewed: 0, correct: 0 });
   const [sessionComplete, setSessionComplete] = useState(false);
   const [poolStatus, setPoolStatus] = useState<PoolStatus | null>(null);
+  const [graduatedWord, setGraduatedWord] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isPractice = searchParams.get('practice') === 'true';
 
   const fetchWords = useCallback(async () => {
     try {
-      const response = await fetch('/api/words?forReview=true&limit=50');
+      const params = isPractice
+        ? 'practice=true&limit=50'
+        : 'forReview=true&limit=50';
+      const response = await fetch(`/api/words?${params}`);
       if (response.ok) {
         const data = await response.json();
         setWords(data);
@@ -53,7 +71,7 @@ export default function ReviewPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isPractice]);
 
   useEffect(() => {
     fetchWords();
@@ -61,9 +79,7 @@ export default function ReviewPage() {
 
   const currentWord = words[currentIndex];
 
-  const generateMeaning = async (word: ReviewWord) => {
-    if (word.meaning) return;
-
+  const generateForWord = async (word: ReviewWord) => {
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -71,13 +87,13 @@ export default function ReviewPage() {
         body: JSON.stringify({
           kanji: word.kanji,
           reading: word.reading,
+          jlptLevel: word.jlptLevel,
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
         
-        // Update the word in the database
         await fetch(`/api/words/${word.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -88,7 +104,6 @@ export default function ReviewPage() {
           }),
         });
 
-        // Update local state
         setWords((prev) =>
           prev.map((w) =>
             w.id === word.id
@@ -103,16 +118,20 @@ export default function ReviewPage() {
         );
       }
     } catch (error) {
-      console.error('Failed to generate meaning:', error);
+      console.error('Failed to generate:', error);
     }
   };
 
   const handleReveal = async () => {
     setIsRevealed(true);
-    // Generate meaning if missing
     if (currentWord && !currentWord.meaning) {
-      await generateMeaning(currentWord);
+      await generateForWord(currentWord);
     }
+  };
+
+  const handleGenerateExample = async () => {
+    if (!currentWord) return;
+    await generateForWord(currentWord);
   };
 
   const handleResponse = async (response: 'forgot' | 'shaky' | 'got_it') => {
@@ -120,16 +139,22 @@ export default function ReviewPage() {
 
     setIsProcessing(true);
     try {
-      await fetch(`/api/progress/${currentWord.id}`, {
+      const res = await fetch(`/api/progress/${currentWord.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response }),
       });
+      const progressData = await res.json();
 
       setSessionStats((prev) => ({
         reviewed: prev.reviewed + 1,
         correct: response === 'got_it' ? prev.correct + 1 : prev.correct,
       }));
+
+      if (progressData.graduated) {
+        setGraduatedWord(currentWord.kanji);
+        setTimeout(() => setGraduatedWord(null), 2000);
+      }
 
       // Move to next word
       if (currentIndex < words.length - 1) {
@@ -260,14 +285,23 @@ export default function ReviewPage() {
   if (words.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4">
-        <h2 className="text-2xl font-bold">All caught up!</h2>
+        <h2 className="text-2xl font-bold">
+          {isPractice ? 'No words yet!' : 'All caught up!'}
+        </h2>
         <p className="text-muted-foreground text-center">
-          No words due for review right now. Check back later or add more words to study.
+          {isPractice
+            ? 'You don\'t have any active words to practice. Start by learning some new words.'
+            : 'No words due for review right now. Check back later or start a practice session.'}
         </p>
         <div className="flex gap-4">
           <Link href="/">
             <Button>Back to Dashboard</Button>
           </Link>
+          {!isPractice && (
+            <Link href="/review?practice=true">
+              <Button variant="outline">Practice Anyway</Button>
+            </Link>
+          )}
           <Link href="/learn">
             <Button variant="outline">Learn New Words</Button>
           </Link>
@@ -287,6 +321,7 @@ export default function ReviewPage() {
             </Button>
           </Link>
           <div className="text-sm text-muted-foreground">
+            {isPractice && <span className="mr-2 text-violet-600 dark:text-violet-400 font-medium">Practice</span>}
             {currentIndex + 1} / {words.length}
           </div>
           <div className="text-sm">
@@ -312,6 +347,7 @@ export default function ReviewPage() {
               comfortLevel={currentWord.comfortLevel || 0}
               isRevealed={isRevealed}
               onReveal={handleReveal}
+              onGenerateExample={handleGenerateExample}
             />
           )}
 
@@ -327,6 +363,14 @@ export default function ReviewPage() {
           )}
         </div>
       </main>
+
+      {/* Graduation toast */}
+      {graduatedWord && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg text-center animate-in fade-in slide-in-from-bottom-4 z-50">
+          <p className="font-bold">{graduatedWord} mastered!</p>
+          <p className="text-sm text-green-100">Moved to known words</p>
+        </div>
+      )}
 
       {/* Skip confirmation modal */}
       <ConfirmModal

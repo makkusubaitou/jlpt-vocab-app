@@ -7,6 +7,14 @@ interface ReviewResult {
   comfortLevel: number;
 }
 
+const REVIEW_INTERVALS: Record<number, number> = {
+  1: 1,
+  2: 2,
+  3: 3,
+  4: 5,
+  5: 8,
+};
+
 export function calculateNextReview(
   response: ReviewResponse,
   currentComfort: number
@@ -15,24 +23,21 @@ export function calculateNextReview(
   
   switch (response) {
     case 'forgot':
-      // Reset comfort level and review in 1 hour
       return {
         nextReview: addHours(now, 1),
         comfortLevel: 1,
       };
     
     case 'shaky':
-      // Keep comfort level, review tomorrow
       return {
         nextReview: addDays(now, 1),
         comfortLevel: Math.max(currentComfort, 1),
       };
     
     case 'got_it':
-      // Increase comfort level, review in (comfort * 2) days
       const newComfort = Math.min(currentComfort + 1, 5);
       return {
-        nextReview: addDays(now, newComfort * 2),
+        nextReview: addDays(now, REVIEW_INTERVALS[newComfort] ?? 8),
         comfortLevel: newComfort,
       };
   }
@@ -40,9 +45,7 @@ export function calculateNextReview(
 
 export function getReviewIntervalText(comfortLevel: number): string {
   if (comfortLevel <= 0) return 'New';
-  if (comfortLevel === 1) return '2 days';
-  if (comfortLevel === 2) return '4 days';
-  if (comfortLevel === 3) return '6 days';
-  if (comfortLevel === 4) return '8 days';
-  return '10 days';
+  const days = REVIEW_INTERVALS[comfortLevel];
+  if (!days) return `${comfortLevel} days`;
+  return days === 1 ? '1 day' : `${days} days`;
 }

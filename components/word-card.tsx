@@ -1,7 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { FuriganaText } from '@/components/furigana';
 
 interface WordCardProps {
   kanji: string;
@@ -13,6 +16,7 @@ interface WordCardProps {
   comfortLevel?: number;
   isRevealed: boolean;
   onReveal: () => void;
+  onGenerateExample?: () => Promise<void>;
 }
 
 export function WordCard({
@@ -25,7 +29,20 @@ export function WordCard({
   comfortLevel = 0,
   isRevealed,
   onReveal,
+  onGenerateExample,
 }: WordCardProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!onGenerateExample) return;
+    setIsGenerating(true);
+    try {
+      await onGenerateExample();
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <Card
       className="w-full max-w-lg mx-auto cursor-pointer transition-all hover:shadow-lg"
@@ -77,13 +94,31 @@ export function WordCard({
             {/* Example sentence */}
             {exampleSentence && (
               <div className="bg-muted rounded-lg p-4 mt-4">
-                <p className="text-lg mb-2">{exampleSentence}</p>
+                <p className="text-lg mb-2 leading-relaxed">
+                  <FuriganaText text={exampleSentence} />
+                </p>
                 {exampleTranslation && (
                   <p className="text-sm text-muted-foreground">
                     {exampleTranslation}
                   </p>
                 )}
               </div>
+            )}
+
+            {/* Generate example button */}
+            {!exampleSentence && isRevealed && onGenerateExample && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleGenerate();
+                }}
+                disabled={isGenerating}
+                className="w-full"
+              >
+                {isGenerating ? 'Generating example...' : 'Generate Example Sentence'}
+              </Button>
             )}
 
             {/* Missing content notice */}

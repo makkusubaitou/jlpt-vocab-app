@@ -4,7 +4,7 @@ import { generateWordData } from '@/lib/claude';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { kanji, reading } = body;
+    const { kanji, reading, jlptLevel } = body;
 
     if (!kanji || !reading) {
       return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const data = await generateWordData(kanji, reading);
+    const data = await generateWordData(kanji, reading, jlptLevel);
 
     return NextResponse.json(data);
   } catch (error) {

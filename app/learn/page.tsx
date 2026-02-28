@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { FuriganaText } from '@/components/furigana';
 
 interface PoolStatus {
   current: number;
@@ -62,6 +63,7 @@ export default function LearnPage() {
         body: JSON.stringify({
           kanji: word.kanji,
           reading: word.reading,
+          jlptLevel: word.jlptLevel,
         }),
       });
 
@@ -271,7 +273,9 @@ export default function LearnPage() {
               {/* Example */}
               {currentWord.exampleSentence && (
                 <div className="bg-muted rounded-lg p-4 mt-4">
-                  <p className="text-lg mb-2">{currentWord.exampleSentence}</p>
+                  <p className="text-lg mb-2 leading-relaxed">
+                    <FuriganaText text={currentWord.exampleSentence} />
+                  </p>
                   {currentWord.exampleTranslation && (
                     <p className="text-sm text-muted-foreground">
                       {currentWord.exampleTranslation}
