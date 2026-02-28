@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, words, userProgress } from '@/lib/db';
-import { eq, and, or, lte, isNull, desc } from 'drizzle-orm';
+import { eq, sql, and, or, lte, isNull, desc } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
             )
           )
         )
-        .orderBy(userProgress.nextReview)
+        .orderBy(sql`RANDOM()`)
         .limit(limit);
 
       return NextResponse.json(result);
