@@ -134,12 +134,21 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* Practice Button */}
-        <Link href="/review?practice=true" className="block">
-          <Button variant="outline" className="w-full h-12 text-base border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950" size="lg">
-            Practice All Words
-          </Button>
-        </Link>
+        {/* Practice options */}
+        <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button asChild variant="outline" className="w-full h-12 text-base border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950" size="lg">
+              <Link href="/review?practice=true">Practice Learning Words</Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full h-12 text-base border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950" size="lg">
+              <Link href="/review?practice=true&scope=learned">Practice All Learned Words</Link>
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Practice all words in your learning pool, plus mastered words and words marked as already known.
+            Practice does not affect your progress.
+          </p>
+        </div>
 
         {/* Progress by Level */}
         <Card>

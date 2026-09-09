@@ -11,6 +11,19 @@ A Japanese vocabulary learning app with spaced repetition for JLPT N5-N1 levels.
 - **Custom Words**: Add your own vocabulary with auto-generated content
 - **Dark Mode**: Built-in theme toggle for comfortable studying
 
+## Practice
+
+Use **Practice Learning Words** to go through your current learning pool, or
+**Practice All Learned Words** to also include mastered words and words marked
+as already known. Both options include every matching word, regardless of when
+it is due for review.
+
+Practice answers only count toward the current session's score. They do not
+change comfort levels, review counts, review schedules, or mastery status.
+Use **Start Review** for scheduled reviews that update your learning progress.
+
+Run `npm test` for the practice and review regression tests.
+
 ## Tech Stack
 
 - **Next.js 14** (App Router)

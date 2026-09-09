@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, words, userProgress } from '@/lib/db';
-import { eq, sql, and, or, lte, isNull, desc } from 'drizzle-orm';
+import { eq, sql, and, or, lte, isNull, desc, inArray } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +14,11 @@ export async function GET(request: NextRequest) {
     if (forReview || practice) {
       const now = new Date();
 
+      const practiceStatuses = searchParams.get('scope') === 'learned'
+        ? ['active', 'known', 'skipped']
+        : ['active'];
       const whereClause = practice
-        ? eq(userProgress.status, 'active')
+        ? inArray(userProgress.status, practiceStatuses)
         : and(
             eq(userProgress.status, 'active'),
             or(
@@ -24,7 +27,7 @@ export async function GET(request: NextRequest) {
             )
           );
 
-      const result = await db
+      const query = db
         .select({
           id: words.id,
           kanji: words.kanji,
@@ -41,9 +44,10 @@ export async function GET(request: NextRequest) {
         .from(userProgress)
         .innerJoin(words, eq(userProgress.wordId, words.id))
         .where(whereClause)
-        .orderBy(sql`RANDOM()`)
-        .limit(limit);
+        .orderBy(sql`RANDOM()`);
 
+      // Practice should include every matching word, including pools larger than 50.
+      const result = await (practice ? query : query.limit(limit));
       return NextResponse.json(result);
     }
 
