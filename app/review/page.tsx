@@ -55,11 +55,12 @@ function ReviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isPractice = searchParams.get('practice') === 'true';
+  const includeLearned = isPractice && searchParams.get('scope') === 'learned';
 
   const fetchWords = useCallback(async () => {
     try {
       const params = isPractice
-        ? 'practice=true&limit=50'
+        ? `practice=true${includeLearned ? '&scope=learned' : ''}`
         : 'forReview=true&limit=50';
       const response = await fetch(`/api/words?${params}`);
       if (response.ok) {
@@ -71,7 +72,7 @@ function ReviewContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [isPractice]);
+  }, [isPractice, includeLearned]);
 
   useEffect(() => {
     fetchWords();
@@ -139,37 +140,43 @@ function ReviewContent() {
 
     setIsProcessing(true);
     try {
-      const res = await fetch(`/api/progress/${currentWord.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response }),
-      });
-      const progressData = await res.json();
+      // Practice answers only contribute to this session's score.
+      if (!isPractice) {
+        const res = await fetch(`/api/progress/${currentWord.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ response }),
+        });
+        if (!res.ok) throw new Error('Failed to save review');
+        const progressData = await res.json();
+
+        if (progressData.graduated) {
+          setGraduatedWord(currentWord.kanji);
+          setTimeout(() => setGraduatedWord(null), 2000);
+        }
+      }
 
       setSessionStats((prev) => ({
         reviewed: prev.reviewed + 1,
         correct: response === 'got_it' ? prev.correct + 1 : prev.correct,
       }));
 
-      if (progressData.graduated) {
-        setGraduatedWord(currentWord.kanji);
-        setTimeout(() => setGraduatedWord(null), 2000);
-      }
-
       // Move to next word
       if (currentIndex < words.length - 1) {
         setCurrentIndex((prev) => prev + 1);
         setIsRevealed(false);
       } else {
-        // Session complete - check pool status
-        try {
-          const learnRes = await fetch('/api/learn');
-          if (learnRes.ok) {
-            const data = await learnRes.json();
-            setPoolStatus(data.poolStatus);
+        // Only scheduled reviews can free up spots in the learning pool.
+        if (!isPractice) {
+          try {
+            const learnRes = await fetch('/api/learn');
+            if (learnRes.ok) {
+              const data = await learnRes.json();
+              setPoolStatus(data.poolStatus);
+            }
+          } catch (error) {
+            console.error('Failed to fetch pool status:', error);
           }
-        } catch (error) {
-          console.error('Failed to fetch pool status:', error);
         }
         setSessionComplete(true);
       }
@@ -181,7 +188,7 @@ function ReviewContent() {
   };
 
   const handleSkip = async () => {
-    if (!currentWord || isProcessing) return;
+    if (isPractice || !currentWord || isProcessing) return;
 
     setIsProcessing(true);
     try {
@@ -235,6 +242,11 @@ function ReviewContent() {
           <div className="text-center space-y-6">
             <div className="text-6xl">🎉</div>
             <h2 className="text-2xl font-bold">Session Complete!</h2>
+            {isPractice && (
+              <p className="text-sm text-muted-foreground">
+                Practice only. Your learning progress and review schedule are unchanged.
+              </p>
+            )}
             
             <Card>
               <CardContent className="p-6">
@@ -290,13 +302,20 @@ function ReviewContent() {
         </h2>
         <p className="text-muted-foreground text-center">
           {isPractice
-            ? 'You don\'t have any active words to practice. Start by learning some new words.'
+            ? includeLearned
+              ? 'You do not have any learned words to practice yet. Start by learning some new words.'
+              : 'You do not have any words in your learning pool. Practice your learned words or learn some new ones.'
             : 'No words due for review right now. Check back later or start a practice session.'}
         </p>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap justify-center gap-4">
           <Link href="/">
             <Button>Back to Dashboard</Button>
           </Link>
+          {isPractice && !includeLearned && (
+            <Link href="/review?practice=true&scope=learned">
+              <Button variant="outline">Practice All Learned Words</Button>
+            </Link>
+          )}
           {!isPractice && (
             <Link href="/review?practice=true">
               <Button variant="outline">Practice Anyway</Button>
@@ -321,7 +340,7 @@ function ReviewContent() {
             </Button>
           </Link>
           <div className="text-sm text-muted-foreground">
-            {isPractice && <span className="mr-2 text-violet-600 dark:text-violet-400 font-medium">Practice</span>}
+            {isPractice && <span className="mr-2 text-violet-600 dark:text-violet-400 font-medium">{includeLearned ? 'All learned' : 'Practice'}</span>}
             {currentIndex + 1} / {words.length}
           </div>
           <div className="text-sm">
@@ -335,6 +354,11 @@ function ReviewContent() {
       {/* Main content */}
       <main className="container mx-auto px-4 py-8 max-w-lg">
         <div className="space-y-8">
+          {isPractice && (
+            <p className="text-sm text-muted-foreground text-center">
+              Practice at your own pace. Answers here do not change your learning progress or review schedule.
+            </p>
+          )}
           {/* Word card */}
           {currentWord && (
             <WordCard
@@ -359,6 +383,7 @@ function ReviewContent() {
               onGotIt={() => handleResponse('got_it')}
               onAlreadyKnow={() => setShowSkipModal(true)}
               isLoading={isProcessing}
+              isPractice={isPractice}
             />
           )}
         </div>

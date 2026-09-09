@@ -8,6 +8,7 @@ interface ReviewButtonsProps {
   onGotIt: () => void;
   onAlreadyKnow: () => void;
   isLoading?: boolean;
+  isPractice?: boolean;
 }
 
 export function ReviewButtons({
@@ -16,6 +17,7 @@ export function ReviewButtons({
   onGotIt,
   onAlreadyKnow,
   isLoading = false,
+  isPractice = false,
 }: ReviewButtonsProps) {
   return (
     <div className="space-y-4">
@@ -30,7 +32,7 @@ export function ReviewButtons({
         >
           <div className="text-center">
             <p className="font-semibold">Forgot</p>
-            <p className="text-xs opacity-80">1 hour</p>
+            {!isPractice && <p className="text-xs opacity-80">1 hour</p>}
           </div>
         </Button>
         
@@ -43,7 +45,7 @@ export function ReviewButtons({
         >
           <div className="text-center">
             <p className="font-semibold">Shaky</p>
-            <p className="text-xs opacity-80">1 day</p>
+            {!isPractice && <p className="text-xs opacity-80">1 day</p>}
           </div>
         </Button>
         
@@ -56,21 +58,23 @@ export function ReviewButtons({
         >
           <div className="text-center">
             <p className="font-semibold">Got it</p>
-            <p className="text-xs opacity-80">+2 days</p>
+            {!isPractice && <p className="text-xs opacity-80">+2 days</p>}
           </div>
         </Button>
       </div>
 
       {/* Already know button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onAlreadyKnow}
-        disabled={isLoading}
-        className="w-full text-muted-foreground"
-      >
-        I already know this word
-      </Button>
+      {!isPractice && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onAlreadyKnow}
+          disabled={isLoading}
+          className="w-full text-muted-foreground"
+        >
+          I already know this word
+        </Button>
+      )}
     </div>
   );
 }
